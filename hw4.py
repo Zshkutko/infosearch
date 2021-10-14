@@ -4,6 +4,7 @@ morph = pymorphy2.MorphAnalyzer()
 import string
 import re
 import nltk
+import pickle
 from nltk.corpus import stopwords
 from scipy import sparse
 import numpy as np
@@ -130,12 +131,15 @@ def index_fast_text(texts):
 
 
 def query_bert(query):
-    query_emb = embed_bert_cls([query], tiny_bert_model, tiny_bert_tokenizer)
-    return sparse.csr_matrix(query_emb)
+    query_embs = []
+    for q in query:
+        query_emb = embed_bert_cls([q], tiny_bert_model, tiny_bert_tokenizer)
+        query_embs.append(query_emb)
+    return sparse.csr_matrix(query_embs)
 
 
 def query_fast_text(query):
-    return index_fast_text(preprocessing(query))
+    return index_fast_text(query)
 
 
 def query_tf_idf(query):
@@ -157,6 +161,13 @@ def search(corpus, embeddings, query):
     return corpus
 
 
+def save_my_index(filename, idx_func, qry_func, corpus, questions):
+    answers_embeddings = idx_func(corpus)
+    questions_embeddings = qry_func(questions)
+    sparse.save_npz(f'index_data/{filename}_answers.npz', answers_embeddings)
+    sparse.save_npz(f'index_data/{filename}_questions.npz', questions_embeddings)
+
+
 def main():
     num_answers = 5
     choice = input('METHOD (BERT, FASTTEXT, TF-IDF, COUNT_VEC, BM25)')
@@ -164,9 +175,9 @@ def main():
     corpus, _, questions = file('questions_about_love.jsonl')
     all_answers_prep = []
     questions_prep = []
-    for text in corpus[1]:
+    for text in corpus:
         all_answers_prep.append(preprocessing(text))
-    for text in corpus[2]:
+    for text in questions:
         questions_prep.append(preprocessing(text))
 
     if choice == 'BERT':
@@ -177,35 +188,44 @@ def main():
             print(search_res[ans])
     elif choice == 'FASTTEXT':
         query = preprocessing(query)
-        answers_embeddings = index_fast_text(corpus)
+        answers_embeddings = index_fast_text(all_answers_prep)
         query = query_fast_text(query)
         search_res = search(corpus, answers_embeddings, query)
         for ans in range(num_answers):
             print(search_res[ans])
     elif choice == 'TF-IDF':
         query = preprocessing(query)
-        answers_embeddings = index_tf_idf(corpus)
+        answers_embeddings = index_tf_idf(all_answers_prep)
         query = query_tf_idf([query])
         search_res = search(corpus, answers_embeddings, query)
         for ans in range(num_answers):
             print(search_res[ans])
     elif choice == 'COUNT_VEC':
         query = preprocessing(query)
-        answers_embeddings = index_count_vec(corpus)
+        answers_embeddings = index_count_vec(all_answers_prep)
         query = query_count_vec([query])
         search_res = search(corpus, answers_embeddings, query)
         for ans in range(num_answers):
             print(search_res[ans])
     elif choice == 'BM25':
         query = preprocessing(query)
-        answers_embeddings = index_bm25(corpus)
+        answers_embeddings = index_bm25(all_answers_prep)
         query = query_bm25([query])
         search_res = search(corpus, answers_embeddings, query)
         for ans in range(num_answers):
             print(search_res[ans])
+    elif choice == 'save':
+        save_my_index('bert', index_tiny_bert, query_bert, corpus, questions)
+        save_my_index('fasttext', index_fast_text, query_fast_text, all_answers_prep, questions_prep)
+        save_my_index('count_vec', index_count_vec, query_count_vec, all_answers_prep, questions_prep)
+        save_my_index('tf-idf', index_tf_idf, query_tf_idf, all_answers_prep, questions_prep)
+        save_my_index('bm25', index_bm25, query_bm25, all_answers_prep, questions_prep)
+        pickle.dump(tf_vectorizer, open('vec_data/bm25.pickle', 'wb'))
+        pickle.dump(tf_vectorizer, open('vec_data/tf-idf.pickle', 'wb'))
+        pickle.dump(tf_vectorizer, open('vec_data/count_vec.pickle', 'wb'))
     else:
         print('Выберите что нибудь!')
-        main()
+        input()
 
 
 if __name__ == '__main__':
