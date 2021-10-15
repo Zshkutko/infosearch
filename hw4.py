@@ -4,6 +4,7 @@ morph = pymorphy2.MorphAnalyzer()
 import string
 import re
 import nltk
+from tqdm import tqdm
 import pickle
 from nltk.corpus import stopwords
 from scipy import sparse
@@ -26,16 +27,14 @@ fast_text_model = KeyedVectors.load('araneum_none_fasttextcbow_300_5_2018.model'
 
 def file(filename):
     with open(filename, 'r', encoding='utf-8') as f:
-        corpus = list(f)[:10000]
+        corpus = list(f)[:10]
     best_answers = []
     all_answers = []
     questions = []
     for text in corpus:
         answers_dict = {}
         answers = json.loads(text)['answers']
-        question = json.loads(text)['question']
-        if question:
-            questions.append(question)
+        questions.append(' '.join(json.loads(text)['question']) + ' '.join(json.loads(text)['comment']))
         if answers:
             for answer in answers:
                 if answer['text'] and answer['author_rating']['value']:
@@ -175,14 +174,14 @@ def save_my_index(filename, idx_func, qry_func, corpus, questions):
 
 def main():
     num_answers = 5
-    choice = input('METHOD (BERT, FASTTEXT, TF-IDF, COUNT_VEC, BM25)')
+    choice = input('METHOD (BERT, FASTTEXT, TFIDF, COUNTVEC, BM25)')
     query = input('QUERY: ')
     corpus, _, questions = file('questions_about_love.jsonl')
     all_answers_prep = []
     questions_prep = []
-    for text in corpus:
+    for text in tqdm(corpus):
         all_answers_prep.append(preprocessing(text))
-    for text in questions:
+    for text in tqdm(questions[:9671]):
         questions_prep.append(preprocessing(text))
 
     if choice == 'BERT':
@@ -198,9 +197,11 @@ def main():
         search_res = search(corpus, answers_embeddings, query)
         for ans in range(num_answers):
             print(search_res[ans])
-    elif choice == 'TF-IDF':
+    elif choice == 'TFIDF':
+        print('GO')
         query = preprocessing(query)
         answers_embeddings = index_tf_idf(all_answers_prep)
+        print(all_answers_prep[:5])
         query = query_tf_idf([query])
         search_res = search(corpus, answers_embeddings, query)
         for ans in range(num_answers):
