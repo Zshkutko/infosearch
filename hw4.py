@@ -198,10 +198,8 @@ def main():
         for ans in range(num_answers):
             print(search_res[ans])
     elif choice == 'TFIDF':
-        print('GO')
         query = preprocessing(query)
         answers_embeddings = index_tf_idf(all_answers_prep)
-        print(all_answers_prep[:5])
         query = query_tf_idf([query])
         search_res = search(corpus, answers_embeddings, query)
         for ans in range(num_answers):
